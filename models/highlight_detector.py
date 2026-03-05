@@ -172,3 +172,31 @@ class Detector(nn.Module):
         m_soft = probs[:, 1:2, :, :] # (B, 1, H, W)
 
         return m_soft
+
+    def get_logits(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Get raw logits for CrossEntropyLoss
+
+        Args:
+            x: Input image tensor
+        Returns:
+            logits: Raw classification logits of shape (B, num_classes, H, W)
+        """
+        # Encoder
+        x1, skip1 = self.enc1(x)
+        x2, skip2 = self.enc2(x1)
+        x3, skip3 = self.enc3(x2)
+        x4, skip4 = self.enc4(x3)
+
+        # Bottleneck
+        x = self.bottleneck(x4)
+
+        # Decoder
+        x = self.dec4(x, skip4)
+        x = self.dec3(x, skip3)
+        x = self.dec2(x, skip2)
+        x = self.dec1(x, skip1)
+
+        # Classification (row logits)
+        logits = self.out(x)
+        return logits
