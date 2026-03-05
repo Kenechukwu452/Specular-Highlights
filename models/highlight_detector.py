@@ -163,4 +163,12 @@ class Detector(nn.Module):
         logits = self.out(x)
 
         # Apply softmax to get probabilities
+        # Channel 0: highlight probability
+        # Channel 1: non-highlight probabilty
+        probs = F.softmax(logits, dim=1)
 
+        # M_soft is the non-highlight probability (channel 1)
+        # So, 0 will be strong highlight, 1 --> non-highlight
+        m_soft = probs[:, 1:2, :, :] # (B, 1, H, W)
+
+        return m_soft
