@@ -200,3 +200,33 @@ class Detector(nn.Module):
         # Classification (row logits)
         logits = self.out(x)
         return logits
+
+def create_detector(in_channels: int = 1,
+                    pre_trained_path: Optional[str] = None
+                    ) -> nn.Module:
+    """
+    Factory function to create the highlight detector model
+    Args:
+        in_channels: Number of input channels
+        pretrained_path: Path to pretrained weights (optional)
+    
+    Returns:
+        The highlight detector model
+    """
+    model = Detector(in_channels=in_channels)
+    if pretrained_path is not None:
+        state_dict = torch.load(pretrained_path, map_location='cpu')
+        model.load_state_dict(state_dict)
+        print(f"Loaded pretrained weights from {pre_trained_path}")
+
+    return model
+
+if __name__ == "__main__":
+    # Testing the highlight detector
+    print("Testing the highlight detector ...")
+    model = Detector(in_channels=1)
+    x = torch.randn(2, 1, 256, 256)
+    m_soft = model(x)
+    print(f"Input shape: {x.shape}")
+    print(f"M_soft shape: {m_soft.shape}")
+    print(f"M_soft range: [{m_soft.min():.4f}, {m_soft.max():.4f}]")
