@@ -1,1 +1,0 @@
-python3 predict1.py "best.pth" "/Users/27171653/Desktop/PhD/3dRender/renders/view_04.png"  --device mps

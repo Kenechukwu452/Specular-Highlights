@@ -15,32 +15,16 @@ The project is organised so that **each model is self-contained** within its own
 ```text
 .
 ├─ data/
-│  ├─ raw/                      # optional: original , meshes, HDRIs, source imagery
-│  ├─ processed/                # dataset outputs (paired views, masks, and metadata)
-│  ├─ splits/                   # train/val/test split files
+│  ├─ blender/                      # Blender renders
+│  ├─ scenes/                # Mitsuba setup
+│  ├─ train/                   # train files
+│  ├─ test/                   # test files
 │  └─ README.md                 # dataset specification and conventions
 │
 ├─ pipeline/
-│  ├─ render/                   # synthetic highlight generation (render configs, scripts)
-│  ├─ transforms/               # augmentation, normalisation, masks, packaging
-│  ├─ io/                       # loaders, writers, metadata schemas
-│  ├─ configs/                  # dataset and render configuration templates
 │  └─ README.md                 # pipeline usage documentation
 │
 ├─ models/
-│  ├─ model_a_name/
-│  │  ├─ configs/
-│  │  ├─ src/
-│  │  ├─ scripts/               # train.py, eval.py, infer.py
-│  │  ├─ checkpoints/           # optional, usually gitignored
-│  │  └─ README.md              # model-specific instructions
-│  │
-│  ├─ model_b_name/
-│  │  ├─ configs/
-│  │  ├─ src/
-│  │  ├─ scripts/
-│  │  ├─ checkpoints/
-│  │  └─ README.md
 │  │
 │  └─ ...
 │
