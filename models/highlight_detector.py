@@ -112,10 +112,10 @@ class Detector(nn.Module):
                 )
 
         # Decoder path
-        self.dec1 = DecoderBlock(base_features * 16, base_features * 8, base_features * 8)
-        self.dec2 = DecoderBlock(base_features * 8, base_features * 4, base_features * 4)
-        self.dec3 = DecoderBlock(base_features * 4, base_features * 2, base_features * 2)
-        self.dec4 = DecoderBlock(base_features * 2, base_features, base_features)
+        self.dec4 = DecoderBlock(base_features * 16, base_features * 8, base_features * 8)
+        self.dec3 = DecoderBlock(base_features * 8, base_features * 4, base_features * 4)
+        self.dec2 = DecoderBlock(base_features * 4, base_features * 2, base_features * 2)
+        self.dec1 = DecoderBlock(base_features * 2, base_features, base_features)
 
         # Classification layer
         self.out = nn.Conv2d(base_features, num_classes, kernel_size=1)
