@@ -15,33 +15,20 @@ The project is organised so that **each model is self-contained** within its own
 ```text
 .
 ├─ data/
-│  ├─ blender/                      # Blender renders
-│  ├─ scenes/                # Mitsuba setup
-│  ├─ train/                   # train files
-│  ├─ test/                   # test files
-│  └─ README.md                 # dataset specification and conventions
+│  ├─ train/                 # train files none
+│  ├─ test/                  # test files none
+│  └─ README.md              
 │
 ├─ pipeline/
 │  └─ README.md                 # pipeline usage documentation
 │
 ├─ models/
-│  │
-│  └─ ...
-│
-├─ notebooks/
-│  ├─ 01_dataset_sanity_checks.ipynb
-│  ├─ 02_render_preview.ipynb
-│  ├─ 03_training_curves.ipynb
-│  └─ 04_qualitative_results.ipynb
-│
-├─ helpers/
-│  ├─ metrics.py                # shared metrics
-│  ├─ viz.py                    # plotting helpers
-│  ├─ misc.py                   # seeding, logging, convenience functions
-│  └─ paths.py                  # path management utilities
+│  ├─ MaskGen/                  #maskgeneration
+│  │   └─src/                                     
+│  │      └─ backbone 
+│  └─ README.md
+│                # path management utilities
 │
 ├─ .gitignore
 ├─ environment                  # ignored
-├─ requirements.txt             # pip requirements
-├─ LICENSE                      # choose a licence
-└─ README.md.                   # structure
+└─ README.md.                   
