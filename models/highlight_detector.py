@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from typing import Tuple, Optional
 
 class ConvBlock(nn.Module):
     """
@@ -19,7 +19,7 @@ class ConvBlock(nn.Module):
         super().__init__()
 
         layers = [
-                nn.Conv2D(in_channels, out_channels, kernel_size, stride, padding, bias=not use_bn)
+                nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=not use_bn)
                 ]
 
         if use_bn:
@@ -47,7 +47,7 @@ class EncoderBlock(nn.Module):
         self.downsample = nn.MaxPool2d(2, 2) if downsample else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = slef.conv1(x)
+        x = self.conv1(x)
         x = self.conv2(x)
         return self.downsample(x), x # downsampled and skip connection
 
@@ -118,7 +118,7 @@ class Detector(nn.Module):
         self.dec4 = DecoderBlock(base_features * 2, base_features, base_features)
 
         # Classification layer
-        self.out = nn.Conv2D(base_features, num_classes, kernel_size=1)
+        self.out = nn.Conv2d(base_features, num_classes, kernel_size=1)
 
         self._init_weights()
 
@@ -126,7 +126,7 @@ class Detector(nn.Module):
         """
         He initialisation
         """
-        for m in self.module():
+        for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
