@@ -1,0 +1,64 @@
+<scene version="3.0.0">
+    <default name="spp" value="256"/>
+    <default name="res" value="256"/>
+    <default name="ring_intensity" value="13383.100773298913"/>
+
+    <integrator type="path"/>
+
+    <sensor type="perspective" id="sensor">
+        <transform name="to_world">
+            <lookat
+                target="142.159256, 86.545776, 152.525208"
+                origin="142.159256, -353.086334, 306.396446"
+                up="0.000000, 0.000000, 1.000000"/>
+        </transform>
+        <sampler type="independent">
+            <integer name="sample_count" value="$spp"/>
+        </sampler>
+        <film type="hdrfilm">
+            <rfilter type="box"/>
+            <integer name="width" value="$res"/>
+            <integer name="height" value="$res"/>
+        </film>
+    </sensor>
+
+    <shape type="ply" id="object">
+        <string name="filename" value="/Users/27171653/Desktop/PhD/Specular-Highlights/data/objects/turbine/Turbine.ply"/>
+        <bsdf type="diffuse" id="object_bsdf">
+            <rgb name="reflectance" value="0.35, 0.35, 0.35"/>
+        </bsdf>
+    </shape>
+
+    <emitter type="point" id="ring0">
+        <point name="position" x="0" y="0" z="0"/>
+        <rgb name="intensity" value="$ring_intensity"/>
+    </emitter>
+    <emitter type="point" id="ring1">
+        <point name="position" x="0" y="0" z="0"/>
+        <rgb name="intensity" value="$ring_intensity"/>
+    </emitter>
+    <emitter type="point" id="ring2">
+        <point name="position" x="0" y="0" z="0"/>
+        <rgb name="intensity" value="$ring_intensity"/>
+    </emitter>
+    <emitter type="point" id="ring3">
+        <point name="position" x="0" y="0" z="0"/>
+        <rgb name="intensity" value="$ring_intensity"/>
+    </emitter>
+    <emitter type="point" id="ring4">
+        <point name="position" x="0" y="0" z="0"/>
+        <rgb name="intensity" value="$ring_intensity"/>
+    </emitter>
+    <emitter type="point" id="ring5">
+        <point name="position" x="0" y="0" z="0"/>
+        <rgb name="intensity" value="$ring_intensity"/>
+    </emitter>
+    <emitter type="point" id="ring6">
+        <point name="position" x="0" y="0" z="0"/>
+        <rgb name="intensity" value="$ring_intensity"/>
+    </emitter>
+    <emitter type="point" id="ring7">
+        <point name="position" x="0" y="0" z="0"/>
+        <rgb name="intensity" value="$ring_intensity"/>
+    </emitter>
+</scene>
