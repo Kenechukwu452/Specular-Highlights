@@ -2,6 +2,7 @@ __pycache__/
 .venv/
 venv/
 .env
-.data/
-.sh_models/prepo/
-.weights/
+sh_models/prepo/
+weights/
+outputs/*-Photoroom.png
+

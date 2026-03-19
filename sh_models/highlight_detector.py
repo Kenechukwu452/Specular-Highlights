@@ -220,5 +220,3 @@ def create_detector(in_channels: int = 1,
         print(f"Loaded pretrained weights from {pre_trained_path}")
 
     return model
-
-
