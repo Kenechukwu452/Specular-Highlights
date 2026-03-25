@@ -38,12 +38,19 @@ soft_gamma=1.0
 residual_mode="additive"
 threshold_method="otsu"
 
-    
-"""diffuse_images = "/Users/27171653/Desktop/PhD/Highlight-modelling/PSD_Dataset/PSD_Dataset/PSD_Train/PSD_Train_diffuse"
-glossy_images = "/Users/27171653/Desktop/PhD/Highlight-modelling/PSD_Dataset/PSD_Dataset/PSD_Train/PSD_Train_specular"
-"""
-diffuse_images = "/Users/27171653/Desktop/PhD/Highlight-modelling/PSD_Dataset/PSD_Dataset/PSD_Train/PSD_Train_diffuse"
-glossy_images = "/Users/27171653/Desktop/PhD/Highlight-modelling/PSD_Dataset/PSD_Dataset/PSD_Train/PSD_Train_specular"
+project_root = Path(__file__).resolve().parent
+default_dataset_root = project_root.parent / "PSD_Dataset" / "PSD_Dataset" / "PSD_Train"
+dataset_root = Path(os.environ.get("PSD_TRAIN_ROOT", default_dataset_root)).expanduser()
+
+diffuse_images = dataset_root / "PSD_Train_diffuse"
+glossy_images = dataset_root / "PSD_Train_specular"
+
+if not diffuse_images.exists() or not glossy_images.exists():
+    raise FileNotFoundError(
+        "Could not find PSD dataset folders. "
+        f"Expected {diffuse_images} and {glossy_images}. "
+        "Set the PSD_TRAIN_ROOT environment variable to the PSD_Train directory if needed."
+    )
 
 
 
@@ -109,6 +116,5 @@ def Diffusion_Train(save_path= save_path,
 
 SpecDiff = Diffusion_Train(save_path, predictor = UNet, loader = loader)
 LatentSpecDiff = Diffusion_Train(save_path, predictor = lantentUNet, loader = loader, latent="true")
-
 
 
