@@ -1,4 +1,5 @@
 from collections import deque
+from typing import Optional
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
@@ -113,7 +114,7 @@ class PSDResidualDataset(Dataset):
 
         return closed.squeeze(0).squeeze(0)
 
-    def _compute_threshold(self, soft_mask: torch.Tensor, aoi: torch.Tensor | None = None) -> torch.Tensor:
+    def _compute_threshold(self, soft_mask: torch.Tensor, aoi: Optional[torch.Tensor] = None) -> torch.Tensor:
         prob_mask = soft_mask.unsqueeze(0).unsqueeze(0)
         if aoi is not None:
             aoi = aoi.unsqueeze(0).unsqueeze(0)
