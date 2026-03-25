@@ -1,0 +1,55 @@
+[2026-03-25 16:37:16] Error in model: UNetWithAttention
+Message: Traceback (most recent call last):
+  File "/Users/27171653/Desktop/PhD/Highlight-modelling/Specular-Highlights/specdiff_train.py", line 210, in train
+    loss = self.train_step(self.model, batch)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Desktop/PhD/Highlight-modelling/Specular-Highlights/specdiff_train.py", line 176, in train_step
+    prediction = model(noisy_xt, t, condition)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Desktop/PhD/Highlight-modelling/Specular-Highlights/sh_models/d_backbone.py", line 185, in forward
+    x = self.attns_down[i](x)
+        ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Desktop/PhD/Highlight-modelling/Specular-Highlights/sh_models/d_backbone.py", line 64, in forward
+    attn_output, _ = self.mha(query=x_ln, key=x_ln, value=x_ln)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/nn/modules/activation.py", line 1488, in forward
+    attn_output, attn_output_weights = F.multi_head_attention_forward(
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/nn/functional.py", line 6450, in multi_head_attention_forward
+    attn_output_weights = torch.bmm(q_scaled, k.transpose(-2, -1))
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Invalid buffer size: 576.00 GiB
+
+================================================================================
+[2026-03-25 16:44:35] Error in model: UNetWithAttention
+Message: Traceback (most recent call last):
+  File "/Users/27171653/Desktop/PhD/Highlight-modelling/Specular-Highlights/specdiff_train.py", line 212, in train
+    loss.backward()
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/_tensor.py", line 625, in backward
+    torch.autograd.backward(
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/autograd/__init__.py", line 354, in backward
+    _engine_run_backward(
+  File "/Users/27171653/Library/Python/3.12/lib/python/site-packages/torch/autograd/graph.py", line 841, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Use .reshape(...) instead.
+
+================================================================================

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
 from PIL import Image
+from torchvision.transforms import InterpolationMode
 import torchvision.transforms.functional as TF
 from pipeline import dhl_generator as dhl_gen
 
@@ -31,6 +32,7 @@ class PSDResidualDataset(Dataset):
         self,
         diffuse_dir,
         glossy_dir,
+        resize_hw=None,
         threshold_method="otsu",
         threshold=0.95,
         kernel_size=3,
@@ -40,6 +42,14 @@ class PSDResidualDataset(Dataset):
     ):
         self.diffuse_dir = Path(diffuse_dir)
         self.glossy_dir = Path(glossy_dir)
+        if resize_hw is None:
+            self.resize_hw = None
+        elif isinstance(resize_hw, int):
+            self.resize_hw = (resize_hw, resize_hw)
+        else:
+            if len(resize_hw) != 2:
+                raise ValueError(f"resize_hw must be an int or a length-2 sequence, got: {resize_hw}")
+            self.resize_hw = tuple(int(dim) for dim in resize_hw)
         self.threshold_method = threshold_method
         self.threshold = threshold
         self.kernel_size = kernel_size
@@ -78,6 +88,13 @@ class PSDResidualDataset(Dataset):
 
     def _load_rgb(self, path):
         img = Image.open(path).convert("RGB")
+        if self.resize_hw is not None:
+            img = TF.resize(
+                img,
+                self.resize_hw,
+                interpolation=InterpolationMode.BILINEAR,
+                antialias=True,
+            )
         return TF.to_tensor(img)
 
     def _morph_open_close(self, mask: torch.Tensor) -> torch.Tensor:
@@ -96,8 +113,10 @@ class PSDResidualDataset(Dataset):
 
         return closed.squeeze(0).squeeze(0)
 
-    def _compute_threshold(self, soft_mask: torch.Tensor) -> torch.Tensor:
+    def _compute_threshold(self, soft_mask: torch.Tensor, aoi: torch.Tensor | None = None) -> torch.Tensor:
         prob_mask = soft_mask.unsqueeze(0).unsqueeze(0)
+        if aoi is not None:
+            aoi = aoi.unsqueeze(0).unsqueeze(0)
 
         if self.threshold_method == "fixed":
             return torch.tensor(float(self.threshold), device=soft_mask.device, dtype=soft_mask.dtype)
@@ -106,6 +125,7 @@ class PSDResidualDataset(Dataset):
             prob_mask,
             method=self.threshold_method,
             q=self.threshold,
+            aoi=aoi,
         )
         return thresholds[0]
 
@@ -154,15 +174,38 @@ class PSDResidualDataset(Dataset):
         return filled_mask.to(device=mask.device, dtype=mask.dtype)
 
     def _extract_mask(self, glossy_img, diffuse_img):
-        # Use residual magnitude itself as the object/residual confidence map.
-        residual_energy = (glossy_img - diffuse_img).abs().mean(dim=0)
+        glossy_luma = glossy_img.mean(dim=0)
+        diffuse_luma = diffuse_img.mean(dim=0)
 
-        soft_mask = residual_energy / (residual_energy.max() + 1e-8)
+        # Specular highlights should make the glossy image brighter than the diffuse one.
+        positive_residual = (glossy_luma - diffuse_luma).clamp_min(0.0)
+
+        # Restrict thresholding to the visible object instead of letting the dark background
+        # dominate the histogram. This keeps the binary mask focused on highlight regions.
+        object_support = torch.maximum(glossy_luma, diffuse_luma)
+        object_threshold = torch.maximum(
+            torch.tensor(0.02, device=object_support.device, dtype=object_support.dtype),
+            object_support.max() * 0.05,
+        )
+        object_aoi = object_support > object_threshold
+        if not torch.any(object_aoi):
+            object_aoi = positive_residual > 0
+
+        # Weight the positive residual by glossy brightness so the score favors bright
+        # highlight pixels instead of broad object-level shading differences.
+        highlight_energy = positive_residual * glossy_luma
+        support_values = highlight_energy[object_aoi]
+        if support_values.numel() == 0:
+            support_values = highlight_energy.flatten()
+
+        scale = torch.quantile(support_values, 0.995).clamp_min(1e-8)
+        soft_mask = (highlight_energy / scale).clamp(0.0, 1.0)
         soft_mask = torch.pow(soft_mask, self.soft_gamma)
+        soft_mask = soft_mask * object_aoi.float()
         soft_mask = soft_mask.clamp(0.0, 1.0)
 
-        threshold = self._compute_threshold(soft_mask)
-        otsu_mask = (soft_mask > threshold).float()
+        threshold = self._compute_threshold(soft_mask, aoi=object_aoi)
+        otsu_mask = ((soft_mask > threshold) & object_aoi).float()
         otsu_mask = self._morph_open_close(otsu_mask)
         if self.fill_holes:
             otsu_mask = self._fill_mask_holes(otsu_mask)
@@ -229,6 +272,7 @@ def make_residual_dataloader(
     batch_size=4,
     shuffle=True,
     num_workers=0,
+    resize_hw=None,
     threshold_method="otsu",
     threshold=0.95,
     kernel_size=3,
@@ -239,6 +283,7 @@ def make_residual_dataloader(
     dataset = PSDResidualDataset(
         diffuse_dir=diffuse_dir,
         glossy_dir=glossy_dir,
+        resize_hw=resize_hw,
         threshold_method=threshold_method,
         threshold=threshold,
         kernel_size=kernel_size,
