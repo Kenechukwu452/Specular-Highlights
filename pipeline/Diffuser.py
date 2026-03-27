@@ -25,14 +25,20 @@ class Diffuser():
         return xt
     
     def calculate_velocity(self, x0, t, noise):
-        """
-        This needs some work
-            1. Betas not preped for this yet
-            2. Wrong formula 
-        """
-        velocity = self.alphas_bar[t]*noise -self.one_minus_alphas_bar[t]*x0
-
+        sqrt_alpha_bar_t = self.sqrt_alphas_bar[t]
+        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alphas_bar[t]
+        velocity = sqrt_alpha_bar_t * noise - sqrt_one_minus_alpha_bar_t * x0
         return velocity
+
+    def predict_x0_from_velocity(self, x_t, t, velocity):
+        sqrt_alpha_bar_t = self.sqrt_alphas_bar[t]
+        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alphas_bar[t]
+        return sqrt_alpha_bar_t * x_t - sqrt_one_minus_alpha_bar_t * velocity
+
+    def predict_noise_from_velocity(self, x_t, t, velocity):
+        sqrt_alpha_bar_t = self.sqrt_alphas_bar[t]
+        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alphas_bar[t]
+        return sqrt_one_minus_alpha_bar_t * x_t + sqrt_alpha_bar_t * velocity
 
     def sample_from_noise(self, model, condition, show_progress=True, ddim=False, skip_steps= 2, v_parm = False):
         with torch.no_grad():
@@ -91,19 +97,10 @@ class Diffuser():
         return  x_t_pre, x_0_pred
     
     def DDIM_Velocity_sample_step(self, x_t,t, t_pre, velocity):
-        '''
-                Fix the velocity modified DDIm sampling function
-        '''
-        coef1 = self.sqrt_alphas_bar[t_pre]
-        coef2 = self.sqrt_one_minus_alphas_bar[t]
-        coef3 = 1/self.sqrt_alphas_bar[t]
-        #sig = stochacity * ( torch.sqrt(self.one_minus_alphas[t_pre]/self.one_minus_alphas[t]) *  torch.sqrt(self.one_minus_alphas[t]/self.alphas[t_pre]))
-        #sig_sqr = torch.square(sig)
-        coef4 = self.sqrt_one_minus_alphas_bar[t_pre] #+sig_sqr)
-        x_0_pred = coef3 * (x_t-coef2*velocity)
-        x_t_dir = (coef4*velocity)
-        x_t_pre = coef1*x_0_pred + x_t_dir  #+ sig*torch.randn_like(x_t)
-        return  x_t_pre, x_0_pred
+        x_0_pred = self.predict_x0_from_velocity(x_t, t, velocity)
+        predicted_noise = self.predict_noise_from_velocity(x_t, t, velocity)
+        x_t_pre = self.sqrt_alphas_bar[t_pre] * x_0_pred + self.sqrt_one_minus_alphas_bar[t_pre] * predicted_noise
+        return x_t_pre, x_0_pred
 
         
     def change_device(self, device):

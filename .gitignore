@@ -5,3 +5,5 @@ venv/
 sh_models/prepo/
 weights/
 outputs/*-Photoroom.png
+models/
+checkpoints/

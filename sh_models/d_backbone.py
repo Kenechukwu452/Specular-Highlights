@@ -129,7 +129,7 @@ class UNetWithAttention(nn.Module):
         """ Initialize UNet with Attention """  
         super().__init__()
         self.time_dim = time_dim
-        self.pos_encoding = PositionalEncoding(embedding_dim=time_dim, max_len=noise_steps + 1)
+        self.pos_encoding = PositionalEncoding(embedding_dim=time_dim, max_len=noise_steps)
         """ Define UNet depth """
         self.in_channels = 6
         self.base_channels = 64
@@ -196,79 +196,6 @@ class UNetWithAttention(nn.Module):
         """ Output """
         return self.final_conv(x)
 
-class LatentUNetWithAttention(nn.Module):
-    def __init__(self,noise_steps: int = 1000, time_dim: int = 256, tran: bool = False,depth: int = 2):
-        """ Initialize UNet with Attention """  
-        super().__init__()
-        self.time_dim = time_dim
-        self.pos_encoding = PositionalEncoding(embedding_dim=time_dim, max_len=noise_steps + 1)
-        """ Define UNet depth """
-        self.in_channels = 8
-        self.base_channels = 64
-        self.depth = depth
-    
-
-        """ Set Down blocks """
-        self.encoders = nn.ModuleList()
-        self.time_embeds_down = nn.ModuleList()
-        self.attns_down = nn.ModuleList()
-
-        in_c = self.in_channels
-        for i in range(self.depth):
-            out_c = self.base_channels * (2 ** i)
-            self.encoders.append(EncoderBlock(in_c, out_c))
-            self.time_embeds_down.append(EmbedTime(out_c))
-            if i < self.depth - 1:  
-                self.attns_down.append(TransformerEncoderSA(out_c))
-            in_c = out_c
-
-        """ Create Bottleneck """
-        self.bottleneck = Bottleneck(in_c,in_c * 2)
-        bottleneck_out_c = in_c * 2
-
-        """ setUp blocks """
-        self.decoders = nn.ModuleList()
-        self.time_embeds_up = nn.ModuleList()
-        self.attns_up = nn.ModuleList()
-
-        in_c = in_c if tran else bottleneck_out_c
-
-        for i in reversed(range(self.depth)):
-            out_c = self.base_channels * (2 ** i)
-            self.decoders.append(DecoderBlock(in_c, out_c))
-            self.time_embeds_up.append(EmbedTime(out_c))
-            if i != 0:  
-                self.attns_up.append(TransformerEncoderSA(out_c))
-            in_c = out_c
-
-        """ Final output layer """
-        self.final_conv = nn.Conv2d(self.base_channels, 4, kernel_size=1)
-
-    def forward(self, x, t: torch.LongTensor,c):
-        t = self.pos_encoding(t)
-        x = torch.cat([c,x], dim=1)
-        skips = []
-        """ Encoder """
-        for i, encoder in enumerate(self.encoders):
-            s, x = encoder(x)
-            skips.append(s)
-            x = self.time_embeds_down[i](x, t)
-            if i < len(self.attns_down):
-                x = self.attns_down[i](x)
-        """ Bottleneck """
-        x = self.bottleneck(x)
-
-        """ Decoder """
-        for i, decoder in enumerate(self.decoders):
-            skip = skips.pop()
-            x = decoder(x, skip)
-            x = self.time_embeds_up[i](x, t)
-            if i < len(self.attns_up):
-                x = self.attns_up[i](x)
-        """ Output """
-        return self.final_conv(x)
-
-    
 class UNetWithTransformer(UNetWithAttention):
     def __init__(self, noise_steps: int = 1000, time_dim: int = 256,size=32,depth: int = 4):
         super().__init__(noise_steps=noise_steps, time_dim=time_dim, tran=True,depth=depth)
