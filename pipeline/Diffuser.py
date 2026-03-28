@@ -30,51 +30,78 @@ class Diffuser():
         velocity = sqrt_alpha_bar_t * noise - sqrt_one_minus_alpha_bar_t * x0
         return velocity
 
+    def predict_x0_from_noise(self, x_t, t, noise):
+        sqrt_alpha_bar_t = self.sqrt_alphas_bar[t].clamp_min(1e-12)
+        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alphas_bar[t]
+        return (x_t - sqrt_one_minus_alpha_bar_t * noise) / sqrt_alpha_bar_t
+
     def predict_x0_from_velocity(self, x_t, t, velocity):
         sqrt_alpha_bar_t = self.sqrt_alphas_bar[t]
         sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alphas_bar[t]
         return sqrt_alpha_bar_t * x_t - sqrt_one_minus_alpha_bar_t * velocity
+
+    def predict_noise_from_x0(self, x_t, t, x0):
+        sqrt_alpha_bar_t = self.sqrt_alphas_bar[t]
+        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alphas_bar[t].clamp_min(1e-12)
+        return (x_t - sqrt_alpha_bar_t * x0) / sqrt_one_minus_alpha_bar_t
 
     def predict_noise_from_velocity(self, x_t, t, velocity):
         sqrt_alpha_bar_t = self.sqrt_alphas_bar[t]
         sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alphas_bar[t]
         return sqrt_one_minus_alpha_bar_t * x_t + sqrt_alpha_bar_t * velocity
 
-    def sample_from_noise(self, model, condition, show_progress=True, ddim=False, skip_steps= 2, v_parm = False):
+    def _resolve_prediction(self, x_t, t, model_output, prediction_type):
+        if prediction_type == "e":
+            predicted_noise = model_output
+            x_0_pred = self.predict_x0_from_noise(x_t, t, predicted_noise)
+        elif prediction_type == "x":
+            x_0_pred = model_output
+            predicted_noise = self.predict_noise_from_x0(x_t, t, x_0_pred)
+        elif prediction_type == "v":
+            x_0_pred = self.predict_x0_from_velocity(x_t, t, model_output)
+            predicted_noise = self.predict_noise_from_velocity(x_t, t, model_output)
+        else:
+            raise ValueError(f"Unknown prediction_type: {prediction_type}")
+        return predicted_noise, x_0_pred
+
+    def sample_from_noise(self, model, condition, show_progress=True, ddim=False, skip_steps= 2, v_parm = False, prediction_type=None):
         with torch.no_grad():
             x_t = torch.randn_like(condition)
-            t_now = torch.tensor([self.steps], device=self.device).repeat(x_t.shape[0])
-            t_pre = t_now - (skip_steps if ddim else 1)  
-            ddim_bar  = range(0, self.steps, skip_steps)
-            ddpm_bar = range(self.steps)
-            if show_progress:
-                if ddim:
-                    p_bar = tqdm(ddim_bar)  
-                else:
-                    p_bar = tqdm(ddpm_bar)  
-            else:
-                if ddim:
-                    p_bar = ddim_bar
-                else:
-                    p_bar = ddpm_bar
-            
-            for t in p_bar:
-                
-                predicted_noise = model(x_t, t_now, condition)
-                
-                
-                if ddim:
-                    x_t, x_0 = self.DDIM_sample_step(x_t, t_now, t_pre, predicted_noise) if v_parm ==False else self.DDIM_Velocity_sample_step(x_t, t_now, t_pre, predicted_noise)
+            if prediction_type is None:
+                prediction_type = "v" if v_parm else "e"
 
-                    # Handle final steps for DDIM
-                    if t == ddim_bar[-1]:
-                        return x_0 
-    
+            if ddim:
+                timesteps = list(range(self.steps - 1, -1, -skip_steps))
+                if timesteps[-1] != 0:
+                    timesteps.append(0)
+            else:
+                timesteps = list(range(self.steps - 1, -1, -1))
+
+            if show_progress:
+                p_bar = tqdm(timesteps)
+            else:
+                p_bar = timesteps
+            
+            for idx, current_t in enumerate(p_bar):
+                t_now = torch.full((x_t.shape[0],), current_t, device=self.device, dtype=torch.long)
+                model_output = model(x_t, t_now, condition)
+                predicted_noise, x_0 = self._resolve_prediction(
+                    x_t,
+                    t_now,
+                    model_output,
+                    prediction_type=prediction_type,
+                )
+
+                if current_t == 0:
+                    return x_0
+
+                prev_t = timesteps[idx + 1]
+                t_pre = torch.full((x_t.shape[0],), prev_t, device=self.device, dtype=torch.long)
+
+                if ddim:
+                    x_t, _ = self.DDIM_sample_step(x_t, t_now, t_pre, predicted_noise)
                 else:
                     x_t = self.DDPM_sample_step(x_t, t_now, t_pre, predicted_noise)
-                
-                t_now = t_pre
-                t_pre = t_pre - (skip_steps if ddim else 1)
             
             return x_t
 
