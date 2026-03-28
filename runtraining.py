@@ -20,19 +20,11 @@ from pathlib import Path
 
 
 
-
-def set_seed(seed=42):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.use_deterministic_algorithms(True)
-set_seed(42)
-
-device = "cpu"# torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+device = "cuda"# torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 os.makedirs('./models', exist_ok=True)
 #huge_loader, big_loader, small_loader = unifoil.get_and_load_dataset(batch_size=10, img_size=32)
 image_size = 64
-batchsize = 4
+batchsize = 10
 noise_steps = 200
 threshold=0.9
 soft_gamma=1.0

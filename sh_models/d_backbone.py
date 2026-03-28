@@ -66,18 +66,29 @@ class TransformerEncoderSA(nn.Module):
         x = self.ff_self(x) + x
         return x.permute(0, 2, 1).reshape(B, C, H, W)
 
+class LayerNorm2d(nn.Module):
+    def __init__(self, num_channels, eps: float = 1e-5):
+        super().__init__()
+        self.norm = nn.LayerNorm(num_channels, eps=eps)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.permute(0, 2, 3, 1)
+        x = self.norm(x)
+        return x.permute(0, 3, 1, 2)
+
+
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.norm1 = LayerNorm2d(out_channels)
         self.relu = nn.ReLU()
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.norm2 = LayerNorm2d(out_channels)
 
     def forward(self, x):
-        x = self.relu(self.bn1(self.conv1(x)))
-        x = self.relu(self.bn2(self.conv2(x)))
+        x = self.relu(self.norm1(self.conv1(x)))
+        x = self.relu(self.norm2(self.conv2(x)))
         return x
 
 class EncoderBlock(nn.Module):
