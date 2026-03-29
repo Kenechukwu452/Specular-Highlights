@@ -1,0 +1,6 @@
+.venv
+checkpoints/
+data/
+models/
+128_checkpoints/
+AiFnet/
