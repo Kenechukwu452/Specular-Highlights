@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 from PIL import Image
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import ConcatDataset, DataLoader, Dataset
 
 import Backbone
 import Diffuser as diff
@@ -33,7 +33,7 @@ SPLIT_DIRS = {
 RUN_CONFIG = argparse.Namespace(
     dataset_source="psd",  # "psd" or "local"
     psd_root="/share/lcn_projects/z0058vfs/project_hl.PSD_Dataset",
-    split="train",
+    split="train",  # "train", "val", "test", or "train+val" for PSD
     glossy_dir=None,
     diffuse_dir=None,
     backbone_module="SDEBackbone",  # "SDEBackbone", "Backbone", "SingBackbone"
@@ -183,6 +183,24 @@ def resolve_split_dirs(psd_root: Path, split: str) -> tuple[Path, Path]:
     return psd_root / glossy_rel, psd_root / diffuse_rel
 
 
+def normalize_split_names(split: str | tuple[str, ...] | list[str]) -> list[str]:
+    if isinstance(split, str):
+        split_names = [part.strip() for part in split.split("+") if part.strip()]
+    elif isinstance(split, (list, tuple)):
+        split_names = [str(name).strip() for name in split if str(name).strip()]
+    else:
+        raise TypeError(f"Unsupported split value: {split!r}")
+
+    if not split_names:
+        raise ValueError("At least one split name is required.")
+
+    deduped_names: list[str] = []
+    for name in split_names:
+        if name not in deduped_names:
+            deduped_names.append(name)
+    return deduped_names
+
+
 def resolve_psd_root(psd_root: Path | None, split: str) -> Path:
     if psd_root is None:
         raise ValueError("Pass --psd-root with the PSD dataset root you want to use.")
@@ -314,6 +332,7 @@ def build_data_loader(
     num_workers: int,
 ) -> tuple[DataLoader, dict[str, str]]:
     root = specdiff_root()
+    split_names = normalize_split_names(split)
     if glossy_dir and diffuse_dir:
         glossy_path = Path(glossy_dir).expanduser().resolve()
         diffuse_path = Path(diffuse_dir).expanduser().resolve()
@@ -324,8 +343,10 @@ def build_data_loader(
             "diffuse_dir": str(diffuse_path),
         }
     elif dataset_source == "local":
+        if len(split_names) != 1:
+            raise ValueError("Local dataset source only supports a single split name.")
         local_root = local_data_root(root)
-        split_root = resolve_local_split_root(local_root, split)
+        split_root = resolve_local_split_root(local_root, split_names[0])
         dataset = LocalPairedDataset(split_root, image_size=image_size)
         info = {
             "dataset_source": "local",
@@ -333,14 +354,28 @@ def build_data_loader(
             "split_root": str(split_root),
         }
     else:
-        discovered_root = resolve_psd_root(psd_root, split=split)
-        glossy_path, diffuse_path = resolve_split_dirs(discovered_root, split)
-        dataset = PSDTaskDataset(glossy_path, diffuse_path, image_size=image_size)
+        discovered_root = resolve_psd_root(psd_root, split=split_names[0])
+        psd_datasets: list[Dataset] = []
+        glossy_dirs: list[str] = []
+        diffuse_dirs: list[str] = []
+        skipped_total = 0
+
+        for split_name in split_names:
+            glossy_path, diffuse_path = resolve_split_dirs(discovered_root, split_name)
+            psd_dataset = PSDTaskDataset(glossy_path, diffuse_path, image_size=image_size)
+            psd_datasets.append(psd_dataset)
+            glossy_dirs.append(str(glossy_path))
+            diffuse_dirs.append(str(diffuse_path))
+            skipped_total += psd_dataset.skipped_samples
+
+        dataset = psd_datasets[0] if len(psd_datasets) == 1 else ConcatDataset(psd_datasets)
         info = {
             "dataset_source": "psd",
             "data_root": str(discovered_root),
-            "glossy_dir": str(glossy_path),
-            "diffuse_dir": str(diffuse_path),
+            "splits": ",".join(split_names),
+            "glossy_dirs": " | ".join(glossy_dirs),
+            "diffuse_dirs": " | ".join(diffuse_dirs),
+            "skipped_samples": str(skipped_total),
         }
 
     loader = DataLoader(
@@ -350,7 +385,7 @@ def build_data_loader(
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
     )
-    if hasattr(dataset, "skipped_samples"):
+    if "skipped_samples" not in info and hasattr(dataset, "skipped_samples"):
         info["skipped_samples"] = str(dataset.skipped_samples)
     return loader, info
 
@@ -489,10 +524,15 @@ def Diffusion_Train(
 
 
 def default_run_name(args: argparse.Namespace) -> str:
+    split_names = normalize_split_names(args.split)
+    split_suffix = ""
+    if len(split_names) != 1 or split_names[0] != "train":
+        split_suffix = f"_split{'-'.join(split_names)}"
     return (
         f"{args.dataset_source}_{args.backbone_module}_{args.model}_"
         f"img{args.image_size}_steps{args.noise_steps}_depth{args.depth}_"
         f"{args.parameterization}_ts{format_value_for_name(args.target_scale)}"
+        f"{split_suffix}"
     )
 
 
