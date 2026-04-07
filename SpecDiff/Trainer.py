@@ -14,8 +14,6 @@ try:
 except ImportError:
     def clear_output(wait=False): pass  # fallback if not in notebook
 
-import OpenFoam_pipeline as prep  # your data loader module
-# from your_model_file import UViT, Diffuser  # <-- Make sure to import your model and diffuser here
 
 
 def get_cosine_lambda(initial_lr,final_lr,epochs,warmup_epoch):
@@ -77,7 +75,7 @@ def requires_grad(model, flag=True):
 
 
 class Trainer:
-    def __init__(self, model, diffuser, data_loader, epochs=1000, lr=1e-4, ema_decay=0.9999, device="cuda", save_path=None,type = "e",aifnetset = True):
+    def __init__(self, model, diffuser, data_loader, epochs=1000, lr=1e-4, ema_decay=0.9999, device="cuda", save_path=None,type = "e", target_scale = 8.0):
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
         self.ema_model = deepcopy(model).to(self.device)
@@ -93,19 +91,19 @@ class Trainer:
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer,get_cosine_lambda(initial_lr=self.lr,final_lr=1e-5,epochs=self.epochs,warmup_epoch=100))
         #self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=epochs)
         self.type = type
-        self.aifnetset = aifnetset
+        self.target_scale = target_scale
+        
         self.total_steps = self.epochs * len(self.data_loader)
         self.progress_bar = tqdm(total=self.total_steps, desc="Training", dynamic_ncols=True)      
 
     def train_step(self, model: torch.nn.Module, batch):
-          # shape: [B, 6, H, W]
-        if self.aifnetset:
-            condition, targets, meta  = batch
-            condition = condition.to(self.device)  # shape: [B, 3, H, W]
-            targets   = targets.to(self.device)  # shape: [B, 3, H, W]
-        else:     
-            condition = batch[:, :3, :, :].to(self.device)  # shape: [B, 3, H, W]
-            targets   = batch[:, 3:, :, :].to(self.device)  # shape: [B, 3, H, W]
+        # shape: [B, 6, H, W]
+
+        condition = batch[:, :3, :, :].to(self.device)  # shape: [B, 3, H, W]
+        diffuse   = batch[:, 3:, :, :].to(self.device)  # shape: [B, 3, H, W] residual
+        residual = diffuse - condition  # shape: [B, 3, H, W]
+        targets = residual
+        targets = targets * self.target_scale
 
         B = condition.size(0)
         t = torch.randint(0, self.diffuser.steps, (B,), dtype=torch.long).to(self.device)
@@ -119,10 +117,6 @@ class Trainer:
             noisy_xt = self.diffuser.forward_diffusion(targets, t, noise)
             prediction = model(noisy_xt, t, condition)
             loss = F.mse_loss(prediction, targets)
-        elif self.type == "v":
-            velocity = self.diffuser.calculate_velocity(targets, t, noise)
-            prediction = model(velocity, t, condition)
-            loss = F.mse_loss(prediction, velocity)
         else:
             raise ValueError(f"Unknown training type: {self.type}")
         del batch, condition, targets
@@ -146,40 +140,25 @@ class Trainer:
 
             for epoch in range(self.epochs):
                 epoch_loss = 0.0
-                if self.aifnetset:
-                    for i, batch in enumerate(self.data_loader):
-                        self.optimizer.zero_grad()
-                        
-                        loss = self.train_step(self.model, batch)
+                
+                for i, batch in enumerate(self.data_loader):
+                    self.optimizer.zero_grad()
+                    
+                    loss = self.train_step(self.model, batch)
 
-                        loss.backward()
-                        self.optimizer.step()
 
-                        update_ema(self.ema_model, self.model, decay=self.ema_decay)
-                        
-                        epoch_loss += loss.item()
-                        self.progress_bar.set_postfix(loss=loss.item(), lr=self.optimizer.param_groups[0]['lr'])
-                        self.progress_bar.update(1)
+                    loss.backward()
+                    self.optimizer.step()
 
-                        del batch , loss
-                        torch.cuda.empty_cache()
-                else:
-                    for step, batch in enumerate(self.data_loader):
-                        self.optimizer.zero_grad()
-                        
-                        loss = self.train_step(self.model, batch)
+                    update_ema(self.ema_model, self.model, decay=self.ema_decay)
+                    
+                    epoch_loss += loss.item()
+                    self.progress_bar.set_postfix(loss=loss.item(), lr=self.optimizer.param_groups[0]['lr'])
+                    self.progress_bar.update(1)
 
-                        loss.backward()
-                        self.optimizer.step()
-
-                        update_ema(self.ema_model, self.model, decay=self.ema_decay)
-                        
-                        epoch_loss += loss.item()
-                        self.progress_bar.set_postfix(loss=loss.item(), lr=self.optimizer.param_groups[0]['lr'])
-                        self.progress_bar.update(1)
-
-                        del batch , loss
-                        torch.cuda.empty_cache()
+                    del batch , loss
+                    torch.cuda.empty_cache()
+                
 
                 loss_history.append(epoch_loss / len(self.data_loader))
                 self.scheduler.step()
